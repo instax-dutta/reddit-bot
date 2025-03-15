@@ -10,18 +10,18 @@ import re
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('RedditStoryBot')
 
-# Reddit and Mistral API Configuration (REMOVED SENSITIVE DATA)
-REDDIT_CLIENT_ID = "YOUR_REDDIT_CLIENT_ID"  # Replace with your client ID
-REDDIT_CLIENT_SECRET = "YOUR_REDDIT_CLIENT_SECRET"  # Replace with your client secret
-REDDIT_USERNAME = "YOUR_REDDIT_USERNAME"  # Replace with your Reddit username
-REDDIT_PASSWORD = "YOUR_REDDIT_PASSWORD"  # Replace with your Reddit password
-USER_AGENT = "tldro"
+# Placeholder for Reddit and Mistral API Configuration
+# These should be set using environment variables or a secure method
+REDDIT_CLIENT_ID = os.getenv('REDDIT_CLIENT_ID')
+REDDIT_CLIENT_SECRET = os.getenv('REDDIT_CLIENT_SECRET')
+REDDIT_USERNAME = os.getenv('REDDIT_USERNAME')
+REDDIT_PASSWORD = os.getenv('REDDIT_PASSWORD')
+USER_AGENT = "YourBotUserAgent"
 
-MISTRAL_API_KEY = "YOUR_MISTRAL_API_KEY"  # Replace with your Mistral API key
-MISTRAL_AGENT_ID = "YOUR_MISTRAL_AGENT_ID"  # Replace with your Mistral agent ID
+MISTRAL_API_KEY = os.getenv('MISTRAL_API_KEY')
+MISTRAL_AGENT_ID = os.getenv('MISTRAL_AGENT_ID')
 MISTRAL_URL = "https://api.mistral.ai/v1/agents/completions"
 
-WEBSITE_URL = "https://sdad.pro"
 PROFILE_LINK = f"https://www.reddit.com/user/{REDDIT_USERNAME}/"
 
 def generate_token(client_id, client_secret, username, password):
@@ -74,18 +74,19 @@ def get_token(client_id, client_secret, username, password):
     return None
 
 def clean_text(text):
-    """Removes unwanted characters and markdown syntax from the text."""
+    """Removes unwanted characters, markdown syntax, and prefixes from the text."""
     # Remove markdown bold/italic symbols
     text = re.sub(r'[*_~]', '', text)
     # Remove any other unwanted characters or patterns
-    text = re.sub(r'[\[\]\(\)]', '', text)  # Remove brackets
-    # Remove common prefixes like "Title:" and "Story:"
+    text = re.sub(r'[\[\]\(\)#]', '', text)  # Remove brackets and hashtags
+    # Remove common prefixes like "Title:", "Story:", and "### "
     text = re.sub(r'^[Tt]itle[:\s]*', '', text)
     text = re.sub(r'^[Ss]tory[:\s]*', '', text)
+    text = re.sub(r'^###\s*', '', text)
     text = text.strip()  # Remove leading/trailing whitespace
     return text
 
-def generate_story_with_mistral():
+def generate_story_with_mistral(api_key, agent_id):
     """Generates a horror story and title using the Mistral AI agent."""
     try:
         payload = {
@@ -96,11 +97,11 @@ def generate_story_with_mistral():
                 }
             ],
             "max_tokens": 500,
-            "agent_id": MISTRAL_AGENT_ID
+            "agent_id": agent_id
         }
 
         headers = {
-            "Authorization": f"Bearer {MISTRAL_API_KEY}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
 
@@ -121,11 +122,11 @@ def generate_story_with_mistral():
         logger.error(f"API Error: {e}")
         return None, None
 
-def post_story_line_to_reddit():
-    profile_name = f"u_{REDDIT_USERNAME}"
+def post_story_line_to_reddit(client_id, client_secret, username, password, api_key, agent_id):
+    profile_name = f"u_{username}"
 
     # Get the access token
-    access_token = get_token(REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USERNAME, REDDIT_PASSWORD)
+    access_token = get_token(client_id, client_secret, username, password)
 
     if not access_token:
         logger.error("Failed to get access token. Please check your credentials and try again.")
@@ -138,11 +139,14 @@ def post_story_line_to_reddit():
 
     while True:
         # Generate a new horror story and title using Mistral AI
-        title, story_line = generate_story_with_mistral()
+        title, story_line = generate_story_with_mistral(api_key, agent_id)
         if not story_line or not title:
             logger.error("Failed to generate a story. Retrying in 1 hour.")
             time.sleep(3600)
             continue
+
+        # Ensure the story does not start with "Story:"
+        story_line = re.sub(r'^[Ss]tory[:\s]*', '', story_line).strip()
 
         post_text = f"{story_line}\n\nLiked the story? Stay tuned and follow {PROFILE_LINK}"
 
@@ -174,4 +178,5 @@ def make_request(url, headers, data):
         logger.error(f"Request failed: {e}")
         return None
 
-post_story_line_to_reddit()
+# Example usage:
+# post_story_line_to_reddit(REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USERNAME, REDDIT_PASSWORD, MISTRAL_API_KEY, MISTRAL_AGENT_ID)
